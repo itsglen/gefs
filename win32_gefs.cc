@@ -66,21 +66,6 @@ Win32DisplayBufferInWindow(win32_offscreen_buffer *Buffer, HDC DeviceContext, in
 
     glEnable(GL_TEXTURE_2D);
 
-    glClearColor(0.0f, 0.0f, 1.0f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
-
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-
-    glBegin(GL_TRIANGLES);
-    glVertex2f(-1.0, 1.0);
-    glVertex2f(1.0, 1.0);
-    glVertex2f(1.0, -1.0);
-    glEnd();
-
     SwapBuffers(DeviceContext);
 }
 
