@@ -55,15 +55,7 @@ Win32DisplayBufferInWindow(win32_offscreen_buffer *Buffer, HDC DeviceContext, in
 {
     glViewport(0, 0, WindowWidth, WindowHeight);
 
-    GLuint TextureHandle;
-    static bool Init = false;
-    if(!Init)
-    {
-        glGenTextures(1, &TextureHandle);
-        Init = true;
-    }
-
-    glBindTexture(GL_TEXTURE_2D, TextureHandle);
+    glBindTexture(GL_TEXTURE_2D, GlobalBlitTextureHandle);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, Buffer->Width, Buffer->Height, 0, GL_BGRA_EXT, GL_UNSIGNED_BYTE, Buffer->Memory);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -74,7 +66,7 @@ Win32DisplayBufferInWindow(win32_offscreen_buffer *Buffer, HDC DeviceContext, in
 
     glEnable(GL_TEXTURE_2D);
 
-    glClearColor(1.0f, 0.0f, 1.0f, 1.0f);
+    glClearColor(0.0f, 0.0f, 1.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
     glMatrixMode(GL_MODELVIEW);
