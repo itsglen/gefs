@@ -4,6 +4,11 @@
 
 #include "win32_gefs.h"
 
+static win32_offscreen_buffer GlobalBackbuffer;
+static GLuint GlobalBlitTextureHandle;
+
+#define Align16(Value) ((Value + 15) & ~15)
+
 static void
 Win32InitOpenGL(HWND Window)
 {
@@ -26,11 +31,7 @@ Win32InitOpenGL(HWND Window)
     HGLRC OpenGLRC = wglCreateContext(WindowDC);
     if(wglMakeCurrent(WindowDC, OpenGLRC))
     {
-
-    }
-    else
-    {
-
+        glGenTextures(1, &GlobalBlitTextureHandle);
     }
 
     ReleaseDC(Window, WindowDC);
@@ -50,22 +51,26 @@ Win32GetWindowDimension(HWND Window)
 }
 
 static void
-Win32DisplayBufferInWindow(HDC DeviceContext, int WindowWidth, int WindowHeight)
+Win32DisplayBufferInWindow(win32_offscreen_buffer *Buffer, HDC DeviceContext, int WindowWidth, int WindowHeight)
 {
     glViewport(0, 0, WindowWidth, WindowHeight);
 
-    // GLuint TextureHandle;
-    // static bool Init = false;
-    // if(!Init)
-    // {
-    //     glGenTextures(1, &TextureHandle);
-    //     Init = true;
-    // }
+    GLuint TextureHandle;
+    static bool Init = false;
+    if(!Init)
+    {
+        glGenTextures(1, &TextureHandle);
+        Init = true;
+    }
 
-    // glBindTexture(GL_TEXTURE_2D, TextureHandle);
-    // glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, Buffer->Width, Buffer->Height, 0, GL_BGRA_EXT, GL_UNSIGNED_BYTE, Buffer->Memory);
+    glBindTexture(GL_TEXTURE_2D, TextureHandle);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, Buffer->Width, Buffer->Height, 0, GL_BGRA_EXT, GL_UNSIGNED_BYTE, Buffer->Memory);
 
-    // glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);    
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);  
+    glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 
     glEnable(GL_TEXTURE_2D);
 
@@ -87,6 +92,32 @@ Win32DisplayBufferInWindow(HDC DeviceContext, int WindowWidth, int WindowHeight)
     SwapBuffers(DeviceContext);
 }
 
+static void
+Win32ResizeDIBSection(win32_offscreen_buffer *Buffer, int Width, int Height)
+{
+    if(Buffer->Memory)
+    {
+        VirtualFree(Buffer->Memory, 0, MEM_RELEASE);
+    }
+
+    Buffer->Width = Width;
+    Buffer->Height = Height;
+
+    int BytesPerPixel = 4;
+    Buffer->BytesPerPixel = BytesPerPixel;
+
+    Buffer->Info.bmiHeader.biSize = sizeof(Buffer->Info.bmiHeader);
+    Buffer->Info.bmiHeader.biWidth = Buffer->Width;
+    Buffer->Info.bmiHeader.biHeight = Buffer->Height;
+    Buffer->Info.bmiHeader.biPlanes = 1;
+    Buffer->Info.bmiHeader.biBitCount = 32;
+    Buffer->Info.bmiHeader.biCompression = BI_RGB;
+
+    Buffer->Pitch = Align16(Width*BytesPerPixel);
+    int BitmapMemorySize = (Buffer->Pitch*Buffer->Height);
+    Buffer->Memory = VirtualAlloc(0, BitmapMemorySize, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+}
+
 static LRESULT CALLBACK
 Win32MainWindowCallback(HWND Window, UINT Message, WPARAM WParam, LPARAM LParam)
 {       
@@ -105,7 +136,7 @@ Win32MainWindowCallback(HWND Window, UINT Message, WPARAM WParam, LPARAM LParam)
             PAINTSTRUCT paint;
             HDC DeviceContext = BeginPaint(Window, &paint);
             win32_window_dimension Dimension = Win32GetWindowDimension(Window);
-            Win32DisplayBufferInWindow(DeviceContext, Dimension.Width, Dimension.Height);
+            Win32DisplayBufferInWindow(&GlobalBackbuffer, DeviceContext, Dimension.Width, Dimension.Height);
             EndPaint(Window, &paint);
         } break;
         default:
@@ -121,6 +152,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     WNDCLASSEX WindowClass;
     HWND hwnd;
     MSG Msg;
+
+    Win32ResizeDIBSection(&GlobalBackbuffer, 1280, 720);
 
     WindowClass.cbSize        = sizeof(WNDCLASSEX);
     WindowClass.style         = 0;
